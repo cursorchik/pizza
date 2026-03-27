@@ -52,6 +52,7 @@ class OrderController extends Controller implements IOrder
                 }
             }
 
+            session()->forget('cart');
             return $this->success($order, "Order #{$order->id} successfully created!");
         }
 

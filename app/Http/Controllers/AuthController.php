@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
+    use ApiResponses;
+
     public function register(Request $request) : JsonResponse
     {
         $request->validate([
@@ -31,15 +33,13 @@ class AuthController extends Controller
 
         $token = Auth::login($user);
 
-        return response()->json([
-            'status' => 'success',
-            'message' => 'User registered successfully',
-            'user' => $user,
+        return $this->success([
+            'user'          => $user,
             'authorisation' => [
                 'token' => $token,
-                'type' => 'bearer',
+                'type'  => 'bearer',
             ]
-        ]);
+        ], 'User registered successfully');
     }
 
     public function login(Request $request) : JsonResponse
@@ -59,47 +59,34 @@ class AuthController extends Controller
             ], 401);
         }
 
-        $user = Auth::user();
-        return response()->json([
-            'status' => 'success',
-            'user' => $user,
+        return $this->success([
+            'user'          => Auth::user(),
             'authorisation' => [
                 'token' => $token,
-                'type' => 'bearer',
+                'type'  => 'bearer',
             ]
-        ]);
+        ], 'Login successful');
 
 //        return $this->respondWithToken($token);
     }
 
-    public function me() : JsonResponse
+    public function me(): JsonResponse
     {
-        return response()->json([
-            'status' => 'success',
-            'user' => Auth::user()
-        ]);
+        return $this->success(Auth::user());
     }
 
-    public function logout() : JsonResponse
+    public function logout(): JsonResponse
     {
         auth()->logout();
-
-        return response()->json([
-            'status' => 'success',
-            'message' => 'Successfully logged out'
-        ]);
+        return $this->success(null, 'Successfully logged out');
     }
 
-    public function refresh() : JsonResponse
+    public function refresh(): JsonResponse
     {
-        return response()->json([
-            'status' => 'success',
-            'user' => Auth::user(),
-            'authorisation' => [
-                'token' => auth()->refresh(),
-                'type' => 'bearer',
-            ]
-        ]);
+        return $this->success([
+            'token' => auth()->refresh(),
+            'type'  => 'bearer',
+        ], 'Token refreshed');
     }
 
 //    protected function respondWithToken(string $token) : JsonResponse

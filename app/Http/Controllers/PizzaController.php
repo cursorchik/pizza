@@ -27,7 +27,7 @@ class PizzaController extends Controller
         $data = $request->only(['name', 'price']);
         $pizza = Pizza::create($data);
 
-        return $this->success($pizza, 'Pizza created successfully');
+        return $this->success($pizza, 'Pizza created successfully', 201);
     }
 
     public function show(Pizza $pizza) : JsonResponse

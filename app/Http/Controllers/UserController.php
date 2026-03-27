@@ -17,38 +17,11 @@ class UserController extends Controller
 
     public function orders() : JsonResponse
     {
+        $orders = Order::where('user_id', auth()->id())
+            ->with(['pizzas', 'drinks'])
+            ->get();
 
-        $orderDrinks = OrderDrink::whereHas('order', function ($query) { $query->where('user_id', auth()->id()); })
-            ->with(['order', 'drink'])
-            ->get()
-            ->map(function ($orderDrink) {
-                return [
-                    'name'          => $orderDrink->drink->name,
-                    'price'         => $orderDrink->drink->price,
-                    'count'         => $orderDrink->count,
-                    'status'        => $orderDrink->order->status,
-                    'created_at'    => $orderDrink->order->created_at,
-                    'totalPrice'    => $orderDrink->drink->price * $orderDrink->count,
-                ];
-            });
-        $orderPizzas = OrderPizza::whereHas('order', function ($query) { $query->where('user_id', auth()->id()); })
-            ->with(['order', 'pizza'])
-            ->get()
-            ->map(function ($orderPizza) {
-                return [
-                    'name'          => $orderPizza->pizza->name,
-                    'price'         => $orderPizza->pizza->price,
-                    'count'         => $orderPizza->count,
-                    'status'        => $orderPizza->order->status,
-                    'created_at'    => $orderPizza->order->created_at,
-                    'totalPrice'    => $orderPizza->pizza->price * $orderPizza->count,
-                ];
-            });
-
-        return $this->success([
-            'pizzas' => $orderPizzas,
-            'orderDrinks' => $orderDrinks
-        ], 'Success retrieve orders!');
+        return $this->success($orders, 'Success retrieve orders!');
     }
 
     public function history(): JsonResponse

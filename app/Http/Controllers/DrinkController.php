@@ -27,7 +27,7 @@ class DrinkController extends Controller
         $data = $request->only(['name', 'price']);
         $drink = Drink::create($data);
 
-        return $this->success($drink, 'Drink created successfully');
+        return $this->success($drink, 'Drink created successfully', 201);
     }
 
     public function show(Drink $drink) : JsonResponse
