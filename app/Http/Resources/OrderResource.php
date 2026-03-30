@@ -15,19 +15,7 @@ class OrderResource extends JsonResource
             'created_at'    => $this->created_at?->toDateTimeString(),
             'delivery_time' => $this->delivery_time?->toDateTimeString(),
             'items'         => $this->whenLoaded('products', function () {
-                return $this->products->map(function ($product) {
-                    return [
-                        'id'         => $product->id,
-                        'name'       => $product->name,
-                        'price'      => (float) $product->price,
-                        'count'      => $product->pivot->count,
-                        'total'      => $product->price * $product->pivot->count,
-                        'type'       => $product->category?->slug,
-                        'attributes' => $product->relationLoaded('attributes')
-                            ? AttributeResource::collection($product->attributes)
-                            : [],
-                    ];
-                });
+                return OrderItemResource::collection($this->products);
             }),
             'total_price'   => $this->products->sum(fn($p) => $p->price * $p->pivot->count),
         ];
