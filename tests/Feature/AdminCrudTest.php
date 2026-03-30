@@ -1,139 +1,129 @@
 <?php
-
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Models\Pizza;
-use App\Models\Drink;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-use PHPUnit\Framework\Attributes\Test;
+use App\Models\Product;
+use App\Models\Category;
+
 use Tests\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class AdminCrudTest extends TestCase
 {
     use RefreshDatabase;
 
-    #[Test]
-    public function test_admin_can_create_pizza()
+    protected function setUp() : void
+    {
+        parent::setUp();
+        Category::create(['name' => 'Пицца', 'slug' => 'pizza']);
+        Category::create(['name' => 'Напитки', 'slug' => 'drinks']);
+    }
+
+    private function getPizzaCategoryId()
+    {
+        return Category::where('slug', 'pizza')->first()->id;
+    }
+
+    public function test_admin_can_create_product()
     {
         $admin = User::factory()->create(['is_admin' => true]);
         $token = auth('api')->login($admin);
+        $categoryId = $this->getPizzaCategoryId();
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/admin/pizzas', [
-                'name' => 'New Pizza',
+            ->postJson(route('admin.products.store'), [
+                'category_id' => $categoryId,
+                'name' => 'Margherita',
                 'price' => 9.99,
+                'attributes' => [
+                    ['name' => 'diameter', 'value' => '30 cm'],
+                    ['name' => 'weight', 'value' => '400 g'],
+                ],
             ]);
 
         $response->assertCreated();
-        $this->assertDatabaseHas('pizzas', ['name' => 'New Pizza', 'price' => 9.99]);
+        $this->assertDatabaseHas('products', ['name' => 'Margherita', 'price' => 9.99]);
+        $this->assertDatabaseHas('product_attributes', [
+            'attribute_name' => 'diameter',
+            'attribute_value' => '30 cm',
+        ]);
     }
 
-    #[Test]
-    public function test_admin_can_update_pizza()
+    public function test_admin_can_update_product()
     {
         $admin = User::factory()->create(['is_admin' => true]);
-        $pizza = Pizza::factory()->create();
+        $product = Product::factory()->create();
         $token = auth('api')->login($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->patchJson("/api/admin/pizzas/{$pizza->id}", [
+            ->putJson(route('admin.products.update', $product), [
                 'name' => 'Updated Name',
                 'price' => 12.99,
             ]);
 
         $response->assertOk();
-        $this->assertDatabaseHas('pizzas', ['id' => $pizza->id, 'name' => 'Updated Name', 'price' => 12.99]);
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'name' => 'Updated Name',
+            'price' => 12.99,
+        ]);
     }
 
-    #[Test]
-    public function test_admin_can_delete_pizza()
+    public function test_admin_can_delete_product()
     {
         $admin = User::factory()->create(['is_admin' => true]);
-        $pizza = Pizza::factory()->create();
+        $product = Product::factory()->create();
         $token = auth('api')->login($admin);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->deleteJson("/api/admin/pizzas/{$pizza->id}");
+            ->deleteJson(route('admin.products.destroy', $product));
 
-        $response->assertNoContent();
-        $this->assertDatabaseMissing('pizzas', ['id' => $pizza->id]);
+        $response->assertOk();
+        $this->assertDatabaseMissing('products', ['id' => $product->id]);
     }
 
-    public function test_non_admin_cannot_create_pizza()
+    public function test_non_admin_cannot_create_product()
     {
         $user = User::factory()->create();
         $token = auth('api')->login($user);
+        $categoryId = $this->getPizzaCategoryId();
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/admin/pizzas', [
+            ->postJson(route('admin.products.store'), [
+                'category_id' => $categoryId,
                 'name' => 'New Pizza',
                 'price' => 9.99,
             ]);
 
         $response->assertForbidden();
+        $this->assertDatabaseMissing('products', ['name' => 'New Pizza']);
     }
 
-    #[Test]
-    public function admin_can_create_drink()
-    {
-        $admin = User::factory()->create(['is_admin' => true]);
-        $token = auth('api')->login($admin);
-
-        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/admin/drinks', [
-                'name' => 'Cola',
-                'price' => 2.99,
-            ]);
-
-        $response->assertCreated();
-        $this->assertDatabaseHas('drinks', ['name' => 'Cola', 'price' => 2.99]);
-    }
-
-    #[Test]
-    public function admin_can_update_drink()
-    {
-        $admin = User::factory()->create(['is_admin' => true]);
-        $drink = Drink::factory()->create(['name' => 'Fanta', 'price' => 1.99]);
-        $token = auth('api')->login($admin);
-
-        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->putJson("/api/admin/drinks/{$drink->id}", [
-                'name' => 'Sprite',
-                'price' => 2.49,
-            ]);
-
-        $response->assertOk();
-        $this->assertDatabaseHas('drinks', ['id' => $drink->id, 'name' => 'Sprite', 'price' => 2.49]);
-    }
-
-    #[Test]
-    public function admin_can_delete_drink()
-    {
-        $admin = User::factory()->create(['is_admin' => true]);
-        $drink = Drink::factory()->create();
-        $token = auth('api')->login($admin);
-
-        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->deleteJson("/api/admin/drinks/{$drink->id}");
-
-        $response->assertNoContent();
-        $this->assertDatabaseMissing('drinks', ['id' => $drink->id]);
-    }
-
-    #[Test]
-    public function non_admin_cannot_create_drink()
+    public function test_non_admin_cannot_update_product()
     {
         $user = User::factory()->create();
+        $product = Product::factory()->create();
         $token = auth('api')->login($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->postJson('/api/admin/drinks', [
-                'name' => 'Cola',
-                'price' => 2.99,
+            ->putJson(route('admin.products.update', $product), [
+                'name' => 'Hacked Name',
             ]);
 
         $response->assertForbidden();
-        $this->assertDatabaseMissing('drinks', ['name' => 'Cola']);
+        $this->assertDatabaseMissing('products', ['id' => $product->id, 'name' => 'Hacked Name']);
+    }
+
+    public function test_non_admin_cannot_delete_product()
+    {
+        $user = User::factory()->create();
+        $product = Product::factory()->create();
+        $token = auth('api')->login($user);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->deleteJson(route('admin.products.destroy', $product));
+
+        $response->assertForbidden();
+        $this->assertDatabaseHas('products', ['id' => $product->id]);
     }
 }

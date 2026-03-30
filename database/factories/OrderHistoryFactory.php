@@ -1,27 +1,25 @@
 <?php
-
 namespace Database\Factories;
 
+use App\Models\User;
 use App\Models\Order;
 use App\Models\OrderHistory;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
-/**
- * @extends Factory<OrderHistory>
- */
 class OrderHistoryFactory extends Factory
 {
-    public function definition(): array
+    protected $model = OrderHistory::class;
+
+    public function definition() : array
     {
         return [
-            'order_id'      => Order::factory(),
-            'user_id'       => User::factory(),
-            'status'        => 'delivered',
-            'address'       => fake()->address(),
-            'delivery_time' => now(),
-            'items'         => json_encode([]),
-            'total_price'   => fake()->randomFloat(2, 10, 100),
+            'order_id' => Order::factory(),
+            'user_id' => User::factory(),
+            'status' => $this->faker->randomElement(['delivered', 'cancelled']),
+            'address' => $this->faker->address,
+            'delivery_time' => $this->faker->dateTimeBetween('-1 week'),
+            'items' => json_encode([]),
+            'total_price' => $this->faker->randomFloat(2, 10, 500),
         ];
     }
 }

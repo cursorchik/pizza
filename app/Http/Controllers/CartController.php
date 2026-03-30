@@ -2,170 +2,62 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Drink;
-use App\Models\Pizza;
+use App\Http\Requests\AddToCartRequest;
+use App\Http\Requests\UpdateCartItemRequest;
+use App\Services\CartService;
 use App\Traits\ApiResponses;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Session;
 
 class CartController extends Controller
 {
     use ApiResponses;
+    protected CartService $cartService;
+
+    public function __construct(CartService $cartService) { $this->cartService = $cartService; }
 
     public function index() : JsonResponse
     {
-        $cart = Session::get('cart', []);
-        $formatted = CartController::formatCart($cart);
-        return $this->success($formatted, 'Cart retrieved successfully');
+        $cart = $this->cartService->formatCart($this->cartService->getCart());
+        return $this->success($cart);
     }
 
-    public function add(Request $request) : JsonResponse
+    public function add(AddToCartRequest $request) : JsonResponse
     {
-        $validated = $request->validate([
-            'type'     => 'required|in:pizza,drink',
-            'id'       => 'required|integer',
-            'quantity' => 'sometimes|integer|min:1',
-        ]);
-
-        $type     = $validated['type'];
-        $id       = $validated['id'];
-        $quantity = $validated['quantity'] ?? 1;
-
-        $model = $type === 'pizza' ? Pizza::find($id) : Drink::find($id);
-        if (!$model) return $this->error("{$type} with id {$id} not found", 404);
-
-        $cart = Session::get('cart', []);
-        $key = "{$type}_{$id}";
-
-        $totalPizzas = 0;
-        $totalDrinks = 0;
-        foreach ($cart as $k => $qty)
+        try
         {
-            if (str_starts_with($k, 'pizza_')) $totalPizzas += $qty;
-            elseif (str_starts_with($k, 'drink_')) $totalDrinks += $qty;
+            $cart = $this->cartService->addItem($request->id, $request->input('quantity', 1));
+            return $this->success($cart, 'Item added');
         }
-
-        if ($type === 'pizza')
+        catch (\Exception $e)
         {
-            $newTotalPizzas = $totalPizzas + $quantity;
-            if ($newTotalPizzas > 10) return $this->error('Maximum 10 pizzas allowed in cart', 422);
+            return $this->error($e->getMessage(), 422);
         }
-        else
-        {
-            $newTotalDrinks = $totalDrinks + $quantity;
-            if ($newTotalDrinks > 20) return $this->error('Maximum 20 drinks allowed in cart', 422);
-        }
-
-        $cart[$key] = ($cart[$key] ?? 0) + $quantity;
-        Session::put('cart', $cart);
-
-        return $this->success($this->formatCart($cart), 'Item added to cart');
     }
 
-    public function update(Request $request, string $type, int $id) : JsonResponse
+    public function update(UpdateCartItemRequest $request, int $id) : JsonResponse
     {
-        $request->validate([
-            'quantity' => 'required|integer|min:0',
-        ]);
-
-        if (!in_array($type, ['pizza', 'drink'])) return $this->error('Invalid type', 422);
-
-        $key = "{$type}_{$id}";
-        $cart = Session::get('cart', []);
-
-        if (!isset($cart[$key])) return $this->error('Item not found in cart', 404);
-
-        $quantity = $request->input('quantity');
-
-        $totalPizzas = 0;
-        $totalDrinks = 0;
-        foreach ($cart as $k => $qty)
+        try
         {
-            if ($k === $key) continue;
-            if (str_starts_with($k, 'pizza_')) $totalPizzas += $qty;
-            elseif (str_starts_with($k, 'drink_')) $totalDrinks += $qty;
+            $cart = $this->cartService->updateItem($id, $request->quantity);
+            return $this->success($cart, 'Cart updated');
         }
-
-        if ($type === 'pizza')
+        catch (\Exception $e)
         {
-            $newTotalPizzas = $totalPizzas + $quantity;
-            if ($newTotalPizzas > 10) return $this->error('Maximum 10 pizzas allowed in cart', 422);
+            return $this->error($e->getMessage(), 422);
         }
-        else
-        {
-            $newTotalDrinks = $totalDrinks + $quantity;
-            if ($newTotalDrinks > 20) return $this->error('Maximum 20 drinks allowed in cart', 422);
-        }
-
-        if ($quantity <= 0) unset($cart[$key]);
-        else $cart[$key] = $quantity;
-
-        Session::put('cart', $cart);
-
-        return $this->success($this->formatCart($cart), 'Cart updated');
     }
 
-    public function destroy(string $type, int $id) : JsonResponse
+    public function destroy(int $id) : JsonResponse
     {
-        if (!in_array($type, ['pizza', 'drink'])) return $this->error('Invalid type', 422);
-
-        $key = "{$type}_{$id}";
-        $cart = Session::get('cart', []);
-
-        if (!isset($cart[$key])) return $this->error('Item not found in cart', 404);
-
-        unset($cart[$key]);
-        session()->put('cart', $cart);
-
-        return $this->success($this->formatCart($cart), 'Item removed from cart');
-    }
-
-    /**
-     * Форматирует корзину для ответа API.
-     *
-     * Преобразует массив корзины, где ключи вида "pizza_1", "drink_2",
-     * в структурированный список с актуальными данными о товарах.
-     *
-     * @param array<string, int> $cart Ассоциативный массив корзины:
-     *                                 ключ – строка типа "{type}_{id}", значение – количество.
-     *
-     * @return array<int, array{
-     *     id: int,
-     *     type: string,
-     *     name: string,
-     *     total: float,
-     *     price: float,
-     *     quantity: int
-     * }> Массив элементов корзины. Каждый элемент содержит:
-     *     - id    : идентификатор товара
-     *     - type  : тип товара ('pizza' или 'drink')
-     *     - name  : название товара
-     *     - total : общая стоимость позиции (цена * количество)
-     *     - price : цена за единицу
-     *     - quantity : количество
-     *     Если товар был удалён из БД, он не включается в результат.
-     */
-    public static function formatCart(array $cart): array
-    {
-        $items = [];
-        foreach ($cart as $key => $quantity)
+        try
         {
-            [$type, $id] = explode('_', $key);
-            $model = $type === 'pizza' ? Pizza::find($id) : Drink::find($id);
-
-            if ($model)
-            {
-                $items[] = [
-                    'id'       => $id,
-                    'type'     => $type,
-                    'name'     => $model->name,
-                    'total'    => $model->price * $quantity,
-                    'price'    => (float) $model->price,
-                    'quantity' => $quantity,
-                ];
-            }
+            $cart = $this->cartService->removeItem($id);
+            return $this->success($cart, 'Item removed');
         }
-        return $items;
+        catch (\Exception $e)
+        {
+            return $this->error($e->getMessage(), 404);
+        }
     }
 }

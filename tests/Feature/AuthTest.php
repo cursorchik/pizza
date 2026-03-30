@@ -1,5 +1,4 @@
 <?php
-
 namespace Tests\Feature;
 
 use App\Models\User;
@@ -11,7 +10,7 @@ class AuthTest extends TestCase
 {
     use RefreshDatabase;
 
-    const string PASSWORD = 'password123';
+    protected const string PASSWORD = 'password123';
 
     public function test_user_can_register()
     {
@@ -22,8 +21,8 @@ class AuthTest extends TestCase
             'password' => self::PASSWORD,
         ];
 
-        $response = $this->postJson('/api/auth/register', $userData);
-        $response->assertOk()
+        $response = $this->postJson(route('auth.register'), $userData);
+        $response->assertCreated()
             ->assertJsonPath('status', 'success')
             ->assertJsonStructure(['data' => ['user', 'authorisation']]);
 
@@ -36,7 +35,7 @@ class AuthTest extends TestCase
             'password' => Hash::make(self::PASSWORD),
         ]);
 
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson(route('auth.login'), [
             'email' => $user->email,
             'password' => self::PASSWORD,
         ]);
@@ -50,7 +49,7 @@ class AuthTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson(route('auth.login'), [
             'email' => $user->email,
             'password' => 'wrong',
         ]);
@@ -65,9 +64,33 @@ class AuthTest extends TestCase
         $token = auth('api')->login($user);
 
         $response = $this->withHeaders(['Authorization' => "Bearer $token"])
-            ->getJson('/api/auth/me');
+            ->getJson(route('auth.me'));
 
         $response->assertOk()
             ->assertJsonPath('data.id', $user->id);
+    }
+
+    public function test_authenticated_user_can_logout()
+    {
+        $user = User::factory()->create();
+        $token = auth('api')->login($user);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->getJson(route('auth.logout'));
+
+        $response->assertOk()
+            ->assertJsonPath('status', 'success');
+    }
+
+    public function test_authenticated_user_can_refresh_token()
+    {
+        $user = User::factory()->create();
+        $token = auth('api')->login($user);
+
+        $response = $this->withHeaders(['Authorization' => "Bearer $token"])
+            ->postJson(route('auth.refresh'));
+
+        $response->assertOk()
+            ->assertJsonStructure(['data' => ['token', 'type']]);
     }
 }

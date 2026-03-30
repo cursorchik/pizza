@@ -1,47 +1,41 @@
 <?php
+// database/seeders/DatabaseSeeder.php
 
 namespace Database\Seeders;
 
-use App\Models\Pizza;
-use App\Models\Drink;
-use App\Models\Order;
-use App\Models\OrderPizza;
-use App\Models\OrderDrink;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\ProductAttribute;
 use Illuminate\Database\Seeder;
-
 
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        Pizza::factory(10)->create();
-        Drink::factory(10)->create();
+        $pizzaCat = Category::create(['name' => 'Пицца', 'slug' => 'pizza']);
+        $drinksCat = Category::create(['name' => 'Напитки', 'slug' => 'drinks']);
 
-        // Создаём 20 заказов, для каждого добавим 1-3 пиццы и 0-2 напитка
-        Order::factory(20)->afterCreating(function (Order $order)
-        {
-            // Добавляем пиццы
-            $pizzas = Pizza::inRandomOrder()->take(rand(1, 3))->get();
-            foreach ($pizzas as $pizza)
-            {
-                OrderPizza::factory()->create([
-                    'order_id' => $order->id,
-                    'pizza_id' => $pizza->id,
-                    'count'    => rand(1, 3),
-                ]);
-            }
+        $pizza = Product::create([
+            'name' => 'Маргарита',
+            'price' => 450.00,
+            'category_id' => $pizzaCat->id,
+        ]);
+        $pizza->attributes()->createMany([
+            ['attribute_name' => 'diameter', 'attribute_value' => '30 cm'],
+            ['attribute_name' => 'weight', 'attribute_value' => '400 g'],
+        ]);
 
-            // Добавляем напитки
-            $drinks = Drink::inRandomOrder()->take(rand(0, 2))->get();
-            foreach ($drinks as $drink)
-            {
-                OrderDrink::factory()->create([
-                    'order_id' => $order->id,
-                    'drink_id' => $drink->id,
-                    'count'    => rand(1, 2),
-                ]);
-            }
-        })
-        ->create();
+        $drink = Product::create([
+            'name' => 'Кока-кола',
+            'price' => 120.00,
+            'category_id' => $drinksCat->id,
+        ]);
+        $drink->attributes()->createMany([
+            ['attribute_name' => 'volume', 'attribute_value' => '0.5 L'],
+            ['attribute_name' => 'sugar_free', 'attribute_value' => 'no'],
+        ]);
+
+        // Дополнительно можно создать случайные продукты
+        // Product::factory(5)->create()->each(fn($p) => ProductAttribute::factory(2)->create(['product_id' => $p->id]));
     }
 }
